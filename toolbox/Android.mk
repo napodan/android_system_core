@@ -11,7 +11,6 @@ TOOLS := \
 	ifconfig \
 	setconsole \
 	rmdir \
-	reboot \
 	getevent \
 	sendevent \
 	date \
