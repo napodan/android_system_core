@@ -613,7 +613,7 @@ class Compiler : public ErrorSink {
         void assertImpl(bool test, int line) {
             if (!test) {
                 error("code generator assertion failed at line %s:%d.", __FILE__, line);
-                LOGD("code generator assertion failed at line %s:%d.", __FILE__, line);
+                ALOGD("code generator assertion failed at line %s:%d.", __FILE__, line);
                 * (char*) 0 = 0;
             }
         }
@@ -978,9 +978,9 @@ class Compiler : public ErrorSink {
     public:
         ARMCodeGenerator() {
 #ifdef ARM_USE_VFP
-            // LOGD("Using ARM VFP hardware floating point.");
+            // ALOGD("Using ARM VFP hardware floating point.");
 #else
-            // LOGD("Using ARM soft floating point.");
+            // ALOGD("Using ARM soft floating point.");
 #endif
         }
 
@@ -4091,7 +4091,7 @@ class Compiler : public ErrorSink {
 
     void assertImpl(bool isTrue, int line) {
         if (!isTrue) {
-            LOGD("%d: assertion failed at line %s:%d.", mLineNumber, __FILE__, line);
+            ALOGD("%d: assertion failed at line %s:%d.", mLineNumber, __FILE__, line);
             internalError();
         }
     }
@@ -6319,7 +6319,7 @@ void accScriptSource(ACCscript* script,
     text[totalLength] = '\0';
 
 #ifdef DEBUG_SAVE_INPUT_TO_FILE
-    LOGD("Saving input to file...");
+    ALOGD("Saving input to file...");
     int counter;
     char path[PATH_MAX];
     for (counter = 0; counter < 4096; counter++) {
@@ -6329,14 +6329,14 @@ void accScriptSource(ACCscript* script,
         }
     }
     if (counter < 4096) {
-        LOGD("Saving input to file %s", path);
+        ALOGD("Saving input to file %s", path);
         FILE* fd = fopen(path, "w");
         if (fd) {
             fwrite(text, totalLength, 1, fd);
             fclose(fd);
-            LOGD("Saved input to file %s", path);
+            ALOGD("Saved input to file %s", path);
         } else {
-            LOGD("Could not save. errno: %d", errno);
+            ALOGD("Could not save. errno: %d", errno);
         }
     }
 #endif
