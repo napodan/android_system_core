@@ -1,6 +1,5 @@
-/* libs/diskconfig/dump_diskconfig.c
- *
- * Copyright 2008, The Android Open Source Project
+/*
+ * Copyright 2011, The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,28 +14,22 @@
  * limitations under the License.
  */
 
-#define LOG_TAG "dump_diskconfig"
-#include <stdio.h>
+#ifndef __CUTILS_ANDROID_REBOOT_H__
+#define __CUTILS_ANDROID_REBOOT_H__
 
-#include <cutils/log.h>
+__BEGIN_DECLS
 
-#include "diskconfig.h"
+/* Commands */
+#define ANDROID_RB_RESTART  0xDEAD0001
+#define ANDROID_RB_POWEROFF 0xDEAD0002
+#define ANDROID_RB_RESTART2 0xDEAD0003
 
-int
-main(int argc, char *argv[])
-{
-    struct disk_info *dinfo;
+/* Flags */
+#define ANDROID_RB_FLAG_NO_SYNC       0x1
+#define ANDROID_RB_FLAG_NO_REMOUNT_RO 0x2
 
-    if (argc < 2) {
-        ALOGE("usage: %s <conf file>", argv[0]);
-        return 1;
-    }
+int android_reboot(int cmd, int flags, char *arg);
 
-    if (!(dinfo = load_diskconfig(argv[1], NULL)))
-        return 1;
+__END_DECLS
 
-    dump_disk_config(dinfo);
-
-    return 0;
-}
-
+#endif /* __CUTILS_ANDROID_REBOOT_H__ */

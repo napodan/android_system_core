@@ -17,6 +17,10 @@
 #ifndef ANDROID_CUTILS_ATOMIC_INLINE_H
 #define ANDROID_CUTILS_ATOMIC_INLINE_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /*
  * Inline declarations and macros for some special-purpose atomic
  * operations.  These are intended for rare circumstances where a
@@ -43,8 +47,8 @@
 #include <cutils/atomic-arm.h>
 #elif defined(__i386__) || defined(__x86_64__)
 #include <cutils/atomic-x86.h>
-#elif defined(__sh__)
-/* implementation is in atomic-android-sh.c */
+#elif defined(__mips__)
+#include <cutils/atomic-mips.h>
 #else
 #error atomic operations are unsupported
 #endif
@@ -53,6 +57,16 @@
 #define ANDROID_MEMBAR_FULL android_compiler_barrier
 #else
 #define ANDROID_MEMBAR_FULL android_memory_barrier
+#endif
+
+#if ANDROID_SMP == 0
+#define ANDROID_MEMBAR_STORE android_compiler_barrier
+#else
+#define ANDROID_MEMBAR_STORE android_memory_store_barrier
+#endif
+
+#ifdef __cplusplus
+}
 #endif
 
 #endif /* ANDROID_CUTILS_ATOMIC_INLINE_H */
