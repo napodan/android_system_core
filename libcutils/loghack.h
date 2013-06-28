@@ -27,12 +27,12 @@
 #include <stdio.h>
 #define LOG(level, ...) \
         ((void)printf("cutils:" level "/" LOG_TAG ": " __VA_ARGS__))
-#define LOGV(...)   LOG("V", __VA_ARGS__)
-#define LOGD(...)   LOG("D", __VA_ARGS__)
-#define LOGI(...)   LOG("I", __VA_ARGS__)
-#define LOGW(...)   LOG("W", __VA_ARGS__)
-#define LOGE(...)   LOG("E", __VA_ARGS__)
-#define LOG_ALWAYS_FATAL(...)   do { LOGE(__VA_ARGS__); exit(1); } while (0)
+#define ALOGV(...)   LOG("V", __VA_ARGS__)
+#define ALOGD(...)   LOG("D", __VA_ARGS__)
+#define ALOGI(...)   LOG("I", __VA_ARGS__)
+#define ALOGW(...)   LOG("W", __VA_ARGS__)
+#define ALOGE(...)   LOG("E", __VA_ARGS__)
+#define LOG_ALWAYS_FATAL(...)   do { ALOGE(__VA_ARGS__); exit(1); } while (0)
 #endif
 
 #endif // _CUTILS_LOGHACK_H

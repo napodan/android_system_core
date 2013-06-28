@@ -1,12 +1,11 @@
-/* libs/diskconfig/dump_diskconfig.c
- *
- * Copyright 2008, The Android Open Source Project
+/*
+ * Copyright (C) 2011 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,28 +14,28 @@
  * limitations under the License.
  */
 
-#define LOG_TAG "dump_diskconfig"
-#include <stdio.h>
+#ifndef __CUTILS_BITOPS_H
+#define __CUTILS_BITOPS_H
 
-#include <cutils/log.h>
+#include <sys/cdefs.h>
 
-#include "diskconfig.h"
+__BEGIN_DECLS
 
-int
-main(int argc, char *argv[])
+static inline int popcount(unsigned int x)
 {
-    struct disk_info *dinfo;
-
-    if (argc < 2) {
-        ALOGE("usage: %s <conf file>", argv[0]);
-        return 1;
-    }
-
-    if (!(dinfo = load_diskconfig(argv[1], NULL)))
-        return 1;
-
-    dump_disk_config(dinfo);
-
-    return 0;
+    return __builtin_popcount(x);
 }
 
+static inline int popcountl(unsigned long x)
+{
+    return __builtin_popcountl(x);
+}
+
+static inline int popcountll(unsigned long long x)
+{
+    return __builtin_popcountll(x);
+}
+
+__END_DECLS
+
+#endif /* __CUTILS_BITOPS_H */
