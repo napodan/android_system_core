@@ -109,7 +109,10 @@ else #!sim
 # ========================================================
 include $(CLEAR_VARS)
 LOCAL_MODULE := libcutils
-LOCAL_SRC_FILES := $(commonSources) ashmem-dev.c mq.c
+LOCAL_SRC_FILES := $(commonSources) \
+        android_reboot.c \
+        ashmem-dev.c \
+        mq.c
 
 ifeq ($(TARGET_ARCH),arm)
 LOCAL_SRC_FILES += arch-arm/memset32.S
