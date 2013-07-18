@@ -34,25 +34,42 @@ extern int ifc_down(const char *name);
 extern int ifc_enable(const char *ifname);
 extern int ifc_disable(const char *ifname);
 
-extern int ifc_reset_connections(const char *ifname);
+#define RESET_IPV4_ADDRESSES 0x01
+#define RESET_IPV6_ADDRESSES 0x02
+#define RESET_ALL_ADDRESSES  (RESET_IPV4_ADDRESSES | RESET_IPV6_ADDRESSES)
+extern int ifc_reset_connections(const char *ifname, const int reset_mask);
 
+extern int ifc_get_addr(const char *name, in_addr_t *addr);
 extern int ifc_set_addr(const char *name, in_addr_t addr);
-extern int ifc_set_mask(const char *name, in_addr_t mask);
+extern int ifc_add_address(const char *name, const char *address,
+                           int prefixlen);
+extern int ifc_del_address(const char *name, const char *address,
+                           int prefixlen);
+extern int ifc_set_prefixLength(const char *name, int prefixLength);
 extern int ifc_set_hwaddr(const char *name, const void *ptr);
+extern int ifc_clear_addresses(const char *name);
 
+/* This function is deprecated. Use ifc_add_route instead. */
 extern int ifc_add_host_route(const char *name, in_addr_t addr);
 extern int ifc_remove_host_routes(const char *name);
 extern int ifc_get_default_route(const char *ifname);
+/* This function is deprecated. Use ifc_add_route instead */
 extern int ifc_set_default_route(const char *ifname, in_addr_t gateway);
+/* This function is deprecated. Use ifc_add_route instead */
 extern int ifc_create_default_route(const char *name, in_addr_t addr);
 extern int ifc_remove_default_route(const char *ifname);
-
-extern int ifc_get_info(const char *name, in_addr_t *addr, in_addr_t *mask,
-                        in_addr_t *flags);
+extern int ifc_add_route(const char *name, const char *addr, int prefix_length,
+                         const char *gw);
+extern int ifc_remove_route(const char *ifname, const char *dst,
+                            int prefix_length, const char *gw);
+extern int ifc_get_info(const char *name, in_addr_t *addr, int *prefixLength,
+                        unsigned *flags);
 
 extern int ifc_configure(const char *ifname, in_addr_t address,
-                         in_addr_t netmask, in_addr_t gateway,
+                         uint32_t prefixLength, in_addr_t gateway,
                          in_addr_t dns1, in_addr_t dns2);
+
+extern in_addr_t prefixLengthToIpv4Netmask(int prefix_length);
 
 __END_DECLS
 
