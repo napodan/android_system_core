@@ -47,7 +47,22 @@
 static int ifc_ctl_sock = -1;
 void printerr(char *fmt, ...);
 
-static const char *ipaddr_to_string(in_addr_t addr)
+in_addr_t prefixLengthToIpv4Netmask(int prefix_length)
+{
+    in_addr_t mask = 0;
+
+    // C99 (6.5.7): shifts of 32 bits have undefined results
+    if (prefix_length <= 0 || prefix_length > 32) {
+        return 0;
+    }
+
+    mask = ~mask << (32 - prefix_length);
+    mask = htonl(mask);
+
+    return mask;
+}
+
+static const char *ipaddr_to_string(uint32_t addr)
 {
     struct in_addr in_addr;
 
