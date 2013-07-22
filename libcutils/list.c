@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009 The Android Open Source Project
+ * Copyright (C) 2008 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,12 +14,24 @@
  * limitations under the License.
  */
 
-#ifndef __USB_VENDORS_H
-#define __USB_VENDORS_H
+#include <cutils/list.h>
 
-extern int vendorIds[];
-extern unsigned  vendorIdCount;
+void list_init(struct listnode *node)
+{
+    node->next = node;
+    node->prev = node;
+}
 
-void usb_vendors_init(void);
+void list_add_tail(struct listnode *head, struct listnode *item)
+{
+    item->next = head;
+    item->prev = head->prev;
+    head->prev->next = item;
+    head->prev = item;
+}
 
-#endif
+void list_remove(struct listnode *item)
+{
+    item->next->prev = item->prev;
+    item->prev->next = item->next;
+}
