@@ -38,12 +38,14 @@
 
 #define OS_PATH_SEPARATOR '\\'
 #define OS_PATH_SEPARATOR_STR "\\"
+#define ENV_PATH_SEPARATOR_STR ";"
 
 typedef CRITICAL_SECTION          adb_mutex_t;
 
 #define  ADB_MUTEX_DEFINE(x)     adb_mutex_t   x
 
 /* declare all mutexes */
+/* For win32, adb_sysdeps_init() will do the mutex runtime initialization. */
 #define  ADB_MUTEX(x)   extern adb_mutex_t  x;
 #include "mutex_list.h"
 
@@ -195,6 +197,8 @@ struct fdevent {
     fdevent *prev;
 
     int fd;
+    int force_eof;
+
     unsigned short state;
     unsigned short events;
 
@@ -251,6 +255,8 @@ static __inline__  int  adb_is_absolute_host_path( const char*  path )
     return isalpha(path[0]) && path[1] == ':' && path[2] == '\\';
 }
 
+extern char*  adb_strtok_r(char *str, const char *delim, char **saveptr);
+
 #else /* !_WIN32 a.k.a. Unix */
 
 #include "fdevent.h"
@@ -272,15 +278,17 @@ static __inline__  int  adb_is_absolute_host_path( const char*  path )
 
 #define OS_PATH_SEPARATOR '/'
 #define OS_PATH_SEPARATOR_STR "/"
+#define ENV_PATH_SEPARATOR_STR ":"
 
 typedef  pthread_mutex_t          adb_mutex_t;
+
 #define  ADB_MUTEX_INITIALIZER    PTHREAD_MUTEX_INITIALIZER
 #define  adb_mutex_init           pthread_mutex_init
 #define  adb_mutex_lock           pthread_mutex_lock
 #define  adb_mutex_unlock         pthread_mutex_unlock
 #define  adb_mutex_destroy        pthread_mutex_destroy
 
-#define  ADB_MUTEX_DEFINE(m)      static adb_mutex_t   m = PTHREAD_MUTEX_INITIALIZER
+#define  ADB_MUTEX_DEFINE(m)      adb_mutex_t   m = PTHREAD_MUTEX_INITIALIZER
 
 #define  adb_cond_t               pthread_cond_t
 #define  adb_cond_init            pthread_cond_init
@@ -288,6 +296,10 @@ typedef  pthread_mutex_t          adb_mutex_t;
 #define  adb_cond_broadcast       pthread_cond_broadcast
 #define  adb_cond_signal          pthread_cond_signal
 #define  adb_cond_destroy         pthread_cond_destroy
+
+/* declare all mutexes */
+#define  ADB_MUTEX(x)   extern adb_mutex_t  x;
+#include "mutex_list.h"
 
 static __inline__ void  close_on_exec(int  fd)
 {
@@ -387,7 +399,13 @@ static __inline__  int  adb_creat(const char*  path, int  mode)
 
 static __inline__ int  adb_socket_accept(int  serverfd, struct sockaddr*  addr, socklen_t  *addrlen)
 {
-    return  accept( serverfd, addr, addrlen );
+    int fd;
+
+    fd = accept(serverfd, addr, addrlen);
+    if (fd >= 0)
+        close_on_exec(fd);
+
+    return fd;
 }
 
 #undef   accept
@@ -475,6 +493,13 @@ static __inline__  int  adb_is_absolute_host_path( const char*  path )
 {
     return path[0] == '/';
 }
+
+static __inline__ char*  adb_strtok_r(char *str, const char *delim, char **saveptr)
+{
+    return strtok_r(str, delim, saveptr);
+}
+#undef   strtok_r
+#define  strtok_r  ___xxx_strtok_r
 
 #endif /* !_WIN32 */
 
