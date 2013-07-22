@@ -113,6 +113,7 @@ LOCAL_MODULE := libcutils
 LOCAL_SRC_FILES := $(commonSources) \
         android_reboot.c \
         ashmem-dev.c \
+        debugger.c \
         mq.c
 
 ifeq ($(TARGET_ARCH),arm)
