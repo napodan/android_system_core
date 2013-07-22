@@ -1,6 +1,6 @@
 /* system/debuggerd/debuggerd.c
 **
-** Copyright 2006, The Android Open Source Project
+** Copyright 2012, The Android Open Source Project
 **
 ** Licensed under the Apache License, Version 2.0 (the "License");
 ** you may not use this file except in compliance with the License.
@@ -34,13 +34,7 @@
 /* enable to dump memory pointed to by every register */
 #define DUMP_MEMORY_FOR_ALL_REGISTERS 1
 
-#ifdef WITH_VFP
-#ifdef WITH_VFP_D32
-#define NUM_VFP_REGS 32
-#else
-#define NUM_VFP_REGS 16
-#endif
-#endif
+#define R(x) ((unsigned int)(x))
 
 static void dump_memory(log_t* log, pid_t tid, uintptr_t addr, bool at_fault) {
     char code_buffer[64];       /* actual 8+1+((8+1)*4) + 1 == 45 */
@@ -53,8 +47,7 @@ static void dump_memory(log_t* log, pid_t tid, uintptr_t addr, bool at_fault) {
         /* catch underflow */
         p = 0;
     }
-    /* Dump more memory content for the crashing thread. */
-    end = p + 256;
+    end = p + 80;
     /* catch overflow; 'end - p' has to be multiples of 16 */
     while (end < p)
         end -= 16;
@@ -82,8 +75,6 @@ static void dump_memory(log_t* log, pid_t tid, uintptr_t addr, bool at_fault) {
             long data = ptrace(PTRACE_PEEKTEXT, tid, (void*)p, NULL);
             sprintf(code_buffer + strlen(code_buffer), "%08lx ", data);
 
-            /* Enable the following code blob to dump ASCII values */
-#if 0
             int j;
             for (j = 0; j < 4; j++) {
                 /*
@@ -98,7 +89,6 @@ static void dump_memory(log_t* log, pid_t tid, uintptr_t addr, bool at_fault) {
                     *asc_out++ = '.';
                 }
             }
-#endif
             p += 4;
         }
         *asc_out = '\0';
@@ -112,23 +102,30 @@ static void dump_memory(log_t* log, pid_t tid, uintptr_t addr, bool at_fault) {
  */
 void dump_memory_and_code(const ptrace_context_t* context __attribute((unused)),
         log_t* log, pid_t tid, bool at_fault) {
-    struct pt_regs regs;
-    if(ptrace(PTRACE_GETREGS, tid, 0, &regs)) {
+    pt_regs_mips_t r;
+    if(ptrace(PTRACE_GETREGS, tid, 0, &r)) {
         return;
     }
 
     if (at_fault && DUMP_MEMORY_FOR_ALL_REGISTERS) {
-        static const char REG_NAMES[] = "r0r1r2r3r4r5r6r7r8r9slfpipsp";
+        static const char REG_NAMES[] = "$0atv0v1a0a1a2a3t0t1t2t3t4t5t6t7s0s1s2s3s4s5s6s7t8t9k0k1gpsps8ra";
 
-        for (int reg = 0; reg < 14; reg++) {
-            /* this may not be a valid way to access, but it'll do for now */
-            uintptr_t addr = regs.uregs[reg];
+        for (int reg = 0; reg < 32; reg++) {
+            /* skip uninteresting registers */
+            if (reg == 0 /* $0 */
+                || reg == 26 /* $k0 */
+                || reg == 27 /* $k1 */
+                || reg == 31 /* $ra (done below) */
+               )
+               continue;
+
+            uintptr_t addr = R(r.regs[reg]);
 
             /*
              * Don't bother if it looks like a small int or ~= null, or if
              * it's in the kernel area.
              */
-            if (addr < 4096 || addr >= 0xc0000000) {
+            if (addr < 4096 || addr >= 0x80000000) {
                 continue;
             }
 
@@ -137,19 +134,22 @@ void dump_memory_and_code(const ptrace_context_t* context __attribute((unused)),
         }
     }
 
-    _LOG(log, !at_fault, "\ncode around pc:\n");
-    dump_memory(log, tid, (uintptr_t)regs.ARM_pc, at_fault);
+    unsigned int pc = R(r.cp0_epc);
+    unsigned int ra = R(r.regs[31]);
 
-    if (regs.ARM_pc != regs.ARM_lr) {
-        _LOG(log, !at_fault, "\ncode around lr:\n");
-        dump_memory(log, tid, (uintptr_t)regs.ARM_lr, at_fault);
+    _LOG(log, !at_fault, "\ncode around pc:\n");
+    dump_memory(log, tid, (uintptr_t)pc, at_fault);
+
+    if (pc != ra) {
+        _LOG(log, !at_fault, "\ncode around ra:\n");
+        dump_memory(log, tid, (uintptr_t)ra, at_fault);
     }
 }
 
 void dump_registers(const ptrace_context_t* context __attribute((unused)),
         log_t* log, pid_t tid, bool at_fault)
 {
-    struct pt_regs r;
+    pt_regs_mips_t r;
     bool only_in_tombstone = !at_fault;
 
     if(ptrace(PTRACE_GETREGS, tid, 0, &r)) {
@@ -157,29 +157,22 @@ void dump_registers(const ptrace_context_t* context __attribute((unused)),
         return;
     }
 
-    _LOG(log, only_in_tombstone, "    r0 %08x  r1 %08x  r2 %08x  r3 %08x\n",
-            (uint32_t)r.ARM_r0, (uint32_t)r.ARM_r1, (uint32_t)r.ARM_r2, (uint32_t)r.ARM_r3);
-    _LOG(log, only_in_tombstone, "    r4 %08x  r5 %08x  r6 %08x  r7 %08x\n",
-            (uint32_t)r.ARM_r4, (uint32_t)r.ARM_r5, (uint32_t)r.ARM_r6, (uint32_t)r.ARM_r7);
-    _LOG(log, only_in_tombstone, "    r8 %08x  r9 %08x  sl %08x  fp %08x\n",
-            (uint32_t)r.ARM_r8, (uint32_t)r.ARM_r9, (uint32_t)r.ARM_r10, (uint32_t)r.ARM_fp);
-    _LOG(log, only_in_tombstone, "    ip %08x  sp %08x  lr %08x  pc %08x  cpsr %08x\n",
-            (uint32_t)r.ARM_ip, (uint32_t)r.ARM_sp, (uint32_t)r.ARM_lr,
-            (uint32_t)r.ARM_pc, (uint32_t)r.ARM_cpsr);
-
-#ifdef WITH_VFP
-    struct user_vfp vfp_regs;
-    int i;
-
-    if(ptrace(PTRACE_GETVFPREGS, tid, 0, &vfp_regs)) {
-        _LOG(log, only_in_tombstone, "cannot get registers: %s\n", strerror(errno));
-        return;
-    }
-
-    for (i = 0; i < NUM_VFP_REGS; i += 2) {
-        _LOG(log, only_in_tombstone, "    d%-2d %016llx  d%-2d %016llx\n",
-                i, vfp_regs.fpregs[i], i+1, vfp_regs.fpregs[i+1]);
-    }
-    _LOG(log, only_in_tombstone, "    scr %08lx\n", vfp_regs.fpscr);
-#endif
+    _LOG(log, only_in_tombstone, " zr %08x  at %08x  v0 %08x  v1 %08x\n",
+     R(r.regs[0]), R(r.regs[1]), R(r.regs[2]), R(r.regs[3]));
+    _LOG(log, only_in_tombstone, " a0 %08x  a1 %08x  a2 %08x  a3 %08x\n",
+     R(r.regs[4]), R(r.regs[5]), R(r.regs[6]), R(r.regs[7]));
+    _LOG(log, only_in_tombstone, " t0 %08x  t1 %08x  t2 %08x  t3 %08x\n",
+     R(r.regs[8]), R(r.regs[9]), R(r.regs[10]), R(r.regs[11]));
+    _LOG(log, only_in_tombstone, " t4 %08x  t5 %08x  t6 %08x  t7 %08x\n",
+     R(r.regs[12]), R(r.regs[13]), R(r.regs[14]), R(r.regs[15]));
+    _LOG(log, only_in_tombstone, " s0 %08x  s1 %08x  s2 %08x  s3 %08x\n",
+     R(r.regs[16]), R(r.regs[17]), R(r.regs[18]), R(r.regs[19]));
+    _LOG(log, only_in_tombstone, " s4 %08x  s5 %08x  s6 %08x  s7 %08x\n",
+     R(r.regs[20]), R(r.regs[21]), R(r.regs[22]), R(r.regs[23]));
+    _LOG(log, only_in_tombstone, " t8 %08x  t9 %08x  k0 %08x  k1 %08x\n",
+     R(r.regs[24]), R(r.regs[25]), R(r.regs[26]), R(r.regs[27]));
+    _LOG(log, only_in_tombstone, " gp %08x  sp %08x  s8 %08x  ra %08x\n",
+     R(r.regs[28]), R(r.regs[29]), R(r.regs[30]), R(r.regs[31]));
+    _LOG(log, only_in_tombstone, " hi %08x  lo %08x bva %08x epc %08x\n",
+     R(r.hi), R(r.lo), R(r.cp0_badvaddr), R(r.cp0_epc));
 }
