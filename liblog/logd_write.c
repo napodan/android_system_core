@@ -56,7 +56,7 @@ static int log_fds[(int)LOG_ID_MAX] = { -1, -1, -1, -1 };
  * the simulator rather than a desktop tool and want to use the device.
  */
 static enum {
-    kLogUninitialized, kLogNotAvailable, kLogAvailable 
+    kLogUninitialized, kLogNotAvailable, kLogAvailable
 } g_log_status = kLogUninitialized;
 int __android_log_dev_available(void)
 {
@@ -141,6 +141,7 @@ int __android_log_write(int prio, const char *tag, const char *msg)
     /* XXX: This needs to go! */
     if (!strcmp(tag, "HTC_RIL") ||
         !strncmp(tag, "RIL", 3) || /* Any log tag with "RIL" as the prefix */
+        !strncmp(tag, "IMS", 3) || /* Any log tag with "IMS" as the prefix */
         !strcmp(tag, "AT") ||
         !strcmp(tag, "GSM") ||
         !strcmp(tag, "STK") ||
@@ -169,6 +170,7 @@ int __android_log_buf_write(int bufID, int prio, const char *tag, const char *ms
     /* XXX: This needs to go! */
     if (!strcmp(tag, "HTC_RIL") ||
         !strncmp(tag, "RIL", 3) || /* Any log tag with "RIL" as the prefix */
+        !strncmp(tag, "IMS", 3) || /* Any log tag with "IMS" as the prefix */
         !strcmp(tag, "AT") ||
         !strcmp(tag, "GSM") ||
         !strcmp(tag, "STK") ||
@@ -189,7 +191,7 @@ int __android_log_buf_write(int bufID, int prio, const char *tag, const char *ms
 
 int __android_log_vprint(int prio, const char *tag, const char *fmt, va_list ap)
 {
-    char buf[LOG_BUF_SIZE];    
+    char buf[LOG_BUF_SIZE];
 
     vsnprintf(buf, LOG_BUF_SIZE, fmt, ap);
 
@@ -223,12 +225,23 @@ int __android_log_buf_print(int bufID, int prio, const char *tag, const char *fm
 void __android_log_assert(const char *cond, const char *tag,
 			  const char *fmt, ...)
 {
-    va_list ap;
-    char buf[LOG_BUF_SIZE];    
+    char buf[LOG_BUF_SIZE];
 
-    va_start(ap, fmt);
-    vsnprintf(buf, LOG_BUF_SIZE, fmt, ap);
-    va_end(ap);
+    if (fmt) {
+        va_list ap;
+        va_start(ap, fmt);
+        vsnprintf(buf, LOG_BUF_SIZE, fmt, ap);
+        va_end(ap);
+    } else {
+        /* Msg not provided, log condition.  N.B. Do not use cond directly as
+         * format string as it could contain spurious '%' syntax (e.g.
+         * "%d" in "blocks%devs == 0").
+         */
+        if (cond)
+            snprintf(buf, LOG_BUF_SIZE, "Assertion failed: %s", cond);
+        else
+            strcpy(buf, "Unspecified assertion failed");
+    }
 
     __android_log_write(ANDROID_LOG_FATAL, tag, buf);
 
