@@ -92,46 +92,48 @@ LOCAL_CFLAGS += $(hostSmpFlag)
 include $(BUILD_HOST_STATIC_LIBRARY)
 
 
-ifeq ($(TARGET_SIMULATOR),true)
-
-# Shared library for simulator
+# Static library for host, 64-bit
 # ========================================================
 include $(CLEAR_VARS)
-LOCAL_MODULE := libcutils
-LOCAL_SRC_FILES := $(commonSources) $(commonHostSources) memory.c dlmalloc_stubs.c
+LOCAL_MODULE := lib64cutils
+LOCAL_SRC_FILES := $(commonSources) $(commonHostSources) dlmalloc_stubs.c
 LOCAL_LDLIBS := -lpthread
-LOCAL_SHARED_LIBRARIES := liblog
-LOCAL_CFLAGS += $(targetSmpFlag)
-include $(BUILD_SHARED_LIBRARY)
+LOCAL_STATIC_LIBRARIES := lib64log
+LOCAL_CFLAGS += $(hostSmpFlag) -m64
+include $(BUILD_HOST_STATIC_LIBRARY)
 
-else #!sim
 
 # Shared and static library for target
 # ========================================================
+
+# This is needed in LOCAL_C_INCLUDES to access the C library's private
+# header named <bionic_time.h>
+#
+libcutils_c_includes := bionic/libc/private
+
 include $(CLEAR_VARS)
 LOCAL_MODULE := libcutils
 LOCAL_SRC_FILES := $(commonSources) \
         android_reboot.c \
         ashmem-dev.c \
         debugger.c \
-        mq.c
+        klog.c \
+        mq.c \
+        partition_utils.c \
+        uevent.c
 
 ifeq ($(TARGET_ARCH),arm)
 LOCAL_SRC_FILES += arch-arm/memset32.S
 else  # !arm
-ifeq ($(TARGET_ARCH),sh)
-LOCAL_SRC_FILES += memory.c atomic-android-sh.c
-else  # !sh
 ifeq ($(TARGET_ARCH_VARIANT),x86-atom)
 LOCAL_CFLAGS += -DHAVE_MEMSET16 -DHAVE_MEMSET32
 LOCAL_SRC_FILES += arch-x86/android_memset16.S arch-x86/android_memset32.S memory.c
 else # !x86-atom
 LOCAL_SRC_FILES += memory.c
 endif # !x86-atom
-endif # !sh
 endif # !arm
 
-LOCAL_C_INCLUDES := $(KERNEL_HEADERS)
+LOCAL_C_INCLUDES := $(libcutils_c_includes) $(KERNEL_HEADERS)
 LOCAL_STATIC_LIBRARIES := liblog
 LOCAL_CFLAGS += $(targetSmpFlag)
 include $(BUILD_STATIC_LIBRARY)
@@ -141,6 +143,6 @@ LOCAL_MODULE := libcutils
 LOCAL_WHOLE_STATIC_LIBRARIES := libcutils
 LOCAL_SHARED_LIBRARIES := liblog
 LOCAL_CFLAGS += $(targetSmpFlag)
+LOCAL_C_INCLUDES := $(libcutils_c_includes)
 include $(BUILD_SHARED_LIBRARY)
 
-endif #!sim
