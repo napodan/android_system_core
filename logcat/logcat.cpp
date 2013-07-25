@@ -101,7 +101,7 @@ static EventTagMap* g_eventTagMap = NULL;
 
 static int openLogFile (const char *pathname)
 {
-    return open(g_outputFileName, O_WRONLY | O_APPEND | O_CREAT, S_IRUSR | S_IWUSR);
+    return open(pathname, O_WRONLY | O_APPEND | O_CREAT, S_IRUSR | S_IWUSR);
 }
 
 static void rotateLogs()
@@ -253,7 +253,7 @@ static void readLogLines(log_device_t* devices)
     int max = 0;
     int ret;
     int queued_lines = 0;
-    bool sleep = true;
+    bool sleep = false;
 
     int result;
     fd_set readset;
@@ -296,6 +296,11 @@ static void readLogLines(log_device_t* devices)
                         fprintf(stderr, "read: Unexpected EOF!\n");
                         exit(EXIT_FAILURE);
                     }
+                    else if (entry->entry.len != ret - sizeof(struct logger_entry)) {
+                        fprintf(stderr, "read: unexpected length. Expected %d, got %d\n",
+                                entry->entry.len, ret - sizeof(struct logger_entry));
+                        exit(EXIT_FAILURE);
+                    }
 
                     entry->entry.msg[entry->entry.len] = '\0';
 
@@ -323,7 +328,7 @@ static void readLogLines(log_device_t* devices)
 
                 // the caller requested to just dump the log and exit
                 if (g_nonblock) {
-                    exit(0);
+                    return;
                 }
             } else {
                 // print all that aren't the last in their list
@@ -402,8 +407,9 @@ static void show_help(const char *cmd)
                     "  -d              dump the log and then exit (don't block)\n"
                     "  -t <count>      print only the most recent <count> lines (implies -d)\n"
                     "  -g              get the size of the log's ring buffer and exit\n"
-                    "  -b <buffer>     request alternate ring buffer\n"
-                    "                  ('main' (default), 'radio', 'events')\n"
+                    "  -b <buffer>     Request alternate ring buffer, 'main', 'system', 'radio'\n"
+                    "                  or 'events'. Multiple -b parameters are allowed and the\n"
+                    "                  results are interleaved. The default is -b main -b system.\n"
                     "  -B              output the log in binary");
 
 
@@ -764,10 +770,10 @@ int main(int argc, char **argv)
     }
 
     if (getLogSize) {
-        return 0;
+        exit(0);
     }
     if (clearLog) {
-        return 0;
+        exit(0);
     }
 
     //LOG_EVENT_INT(10, 12345);
