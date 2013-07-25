@@ -29,18 +29,25 @@
 #include <sysutils/SocketListener.h>
 #include <sysutils/SocketClient.h>
 
+#define LOG_NDEBUG 0
+
 SocketListener::SocketListener(const char *socketName, bool listen) {
-    mListen = listen;
-    mSocketName = socketName;
-    mSock = -1;
-    pthread_mutex_init(&mClientsLock, NULL);
-    mClients = new SocketClientCollection();
+    init(socketName, -1, listen, false);
 }
 
 SocketListener::SocketListener(int socketFd, bool listen) {
+    init(NULL, socketFd, listen, false);
+}
+
+SocketListener::SocketListener(const char *socketName, bool listen, bool useCmdNum) {
+    init(socketName, -1, listen, useCmdNum);
+}
+
+void SocketListener::init(const char *socketName, int socketFd, bool listen, bool useCmdNum) {
     mListen = listen;
-    mSocketName = NULL;
+    mSocketName = socketName;
     mSock = socketFd;
+    mUseCmdNum = useCmdNum;
     pthread_mutex_init(&mClientsLock, NULL);
     mClients = new SocketClientCollection();
 }
@@ -54,8 +61,8 @@ SocketListener::~SocketListener() {
         close(mCtrlPipe[1]);
     }
     SocketClientCollection::iterator it;
-    for (it = mClients->begin(); it != mClients->end(); ++it) {
-        delete (*it);
+    for (it = mClients->begin(); it != mClients->end();) {
+        (*it)->decRef();
         it = mClients->erase(it);
     }
     delete mClients;
@@ -73,13 +80,14 @@ int SocketListener::startListener() {
                  mSocketName, strerror(errno));
             return -1;
         }
+        SLOGV("got mSock = %d for %s", mSock, mSocketName);
     }
 
     if (mListen && listen(mSock, 4) < 0) {
         SLOGE("Unable to listen on socket (%s)", strerror(errno));
         return -1;
     } else if (!mListen)
-        mClients->push_back(new SocketClient(mSock));
+        mClients->push_back(new SocketClient(mSock, false, mUseCmdNum));
 
     if (pipe(mCtrlPipe)) {
         SLOGE("pipe failed (%s)", strerror(errno));
@@ -96,8 +104,10 @@ int SocketListener::startListener() {
 
 int SocketListener::stopListener() {
     char c = 0;
+    int  rc;
 
-    if (write(mCtrlPipe[1], &c, 1) != 1) {
+    rc = TEMP_FAILURE_RETRY(write(mCtrlPipe[1], &c, 1));
+    if (rc != 1) {
         SLOGE("Error writing to control pipe (%s)", strerror(errno));
         return -1;
     }
@@ -118,7 +128,7 @@ int SocketListener::stopListener() {
     }
 
     SocketClientCollection::iterator it;
-    for (it = mClients->begin(); it != mClients->end(); ++it) {
+    for (it = mClients->begin(); it != mClients->end();) {
         delete (*it);
         it = mClients->erase(it);
     }
@@ -135,11 +145,13 @@ void *SocketListener::threadStart(void *obj) {
 
 void SocketListener::runListener() {
 
+    SocketClientCollection *pendingList = new SocketClientCollection();
+
     while(1) {
         SocketClientCollection::iterator it;
         fd_set read_fds;
         int rc = 0;
-        int max = 0;
+        int max = -1;
 
         FD_ZERO(&read_fds);
 
@@ -154,14 +166,17 @@ void SocketListener::runListener() {
 
         pthread_mutex_lock(&mClientsLock);
         for (it = mClients->begin(); it != mClients->end(); ++it) {
-            FD_SET((*it)->getSocket(), &read_fds);
-            if ((*it)->getSocket() > max)
-                max = (*it)->getSocket();
+            int fd = (*it)->getSocket();
+            FD_SET(fd, &read_fds);
+            if (fd > max)
+                max = fd;
         }
         pthread_mutex_unlock(&mClientsLock);
-
+        SLOGV("mListen=%d, max=%d, mSocketName=%s", mListen, max, mSocketName);
         if ((rc = select(max + 1, &read_fds, NULL, NULL, NULL)) < 0) {
-            SLOGE("select failed (%s)", strerror(errno));
+            if (errno == EINTR)
+                continue;
+            SLOGE("select failed (%s) mListen=%d, max=%d", strerror(errno), mListen, max);
             sleep(1);
             continue;
         } else if (!rc)
@@ -171,40 +186,61 @@ void SocketListener::runListener() {
             break;
         if (mListen && FD_ISSET(mSock, &read_fds)) {
             struct sockaddr addr;
-            socklen_t alen = sizeof(addr);
+            socklen_t alen;
             int c;
 
-            if ((c = accept(mSock, &addr, &alen)) < 0) {
+            do {
+                alen = sizeof(addr);
+                c = accept(mSock, &addr, &alen);
+                SLOGV("%s got %d from accept", mSocketName, c);
+            } while (c < 0 && errno == EINTR);
+            if (c < 0) {
                 SLOGE("accept failed (%s)", strerror(errno));
                 sleep(1);
                 continue;
             }
             pthread_mutex_lock(&mClientsLock);
-            mClients->push_back(new SocketClient(c));
+            mClients->push_back(new SocketClient(c, true, mUseCmdNum));
             pthread_mutex_unlock(&mClientsLock);
         }
 
-        do {
-            pthread_mutex_lock(&mClientsLock);
-            for (it = mClients->begin(); it != mClients->end(); ++it) {
-                int fd = (*it)->getSocket();
-                if (FD_ISSET(fd, &read_fds)) {
-                    pthread_mutex_unlock(&mClientsLock);
-                    if (!onDataAvailable(*it)) {
-                        close(fd);
-                        pthread_mutex_lock(&mClientsLock);
-                        delete *it;
-                        it = mClients->erase(it);
-                        pthread_mutex_unlock(&mClientsLock);
-                    }
-                    FD_CLR(fd, &read_fds);
-                    pthread_mutex_lock(&mClientsLock);
-                    continue;
-                }
+        /* Add all active clients to the pending list first */
+        pendingList->clear();
+        pthread_mutex_lock(&mClientsLock);
+        for (it = mClients->begin(); it != mClients->end(); ++it) {
+            int fd = (*it)->getSocket();
+            if (FD_ISSET(fd, &read_fds)) {
+                pendingList->push_back(*it);
             }
-            pthread_mutex_unlock(&mClientsLock);
-        } while (0);
+        }
+        pthread_mutex_unlock(&mClientsLock);
+
+        /* Process the pending list, since it is owned by the thread,
+         * there is no need to lock it */
+        while (!pendingList->empty()) {
+            /* Pop the first item from the list */
+            it = pendingList->begin();
+            SocketClient* c = *it;
+            pendingList->erase(it);
+            /* Process it, if false is returned and our sockets are
+             * connection-based, remove and destroy it */
+            if (!onDataAvailable(c) && mListen) {
+                /* Remove the client from our array */
+                SLOGV("going to zap %d for %s", c->getSocket(), mSocketName);
+                pthread_mutex_lock(&mClientsLock);
+                for (it = mClients->begin(); it != mClients->end(); ++it) {
+                    if (*it == c) {
+                        mClients->erase(it);
+                        break;
+                    }
+                }
+                pthread_mutex_unlock(&mClientsLock);
+                /* Remove our reference to the client */
+                c->decRef();
+            }
+        }
     }
+    delete pendingList;
 }
 
 void SocketListener::sendBroadcast(int code, const char *msg, bool addErrno) {
@@ -212,19 +248,8 @@ void SocketListener::sendBroadcast(int code, const char *msg, bool addErrno) {
     SocketClientCollection::iterator i;
 
     for (i = mClients->begin(); i != mClients->end(); ++i) {
-        if ((*i)->sendMsg(code, msg, addErrno)) {
-            SLOGW("Error sending broadcast (%s)", strerror(errno));
-        }
-    }
-    pthread_mutex_unlock(&mClientsLock);
-}
-
-void SocketListener::sendBroadcast(const char *msg) {
-    pthread_mutex_lock(&mClientsLock);
-    SocketClientCollection::iterator i;
-
-    for (i = mClients->begin(); i != mClients->end(); ++i) {
-        if ((*i)->sendMsg(msg)) {
+        // broadcasts are unsolicited and should not include a cmd number
+        if ((*i)->sendMsg(code, msg, addErrno, false)) {
             SLOGW("Error sending broadcast (%s)", strerror(errno));
         }
     }
