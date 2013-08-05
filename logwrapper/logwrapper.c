@@ -18,7 +18,6 @@
 #include <stdlib.h>
 #include <sys/wait.h>
 #include <unistd.h>
-#include <errno.h>
 
 #include <logwrap/logwrap.h>
 #include <cutils/klog.h>
