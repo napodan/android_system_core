@@ -7,7 +7,7 @@ include $(CLEAR_VARS)
 LOCAL_MODULE:= libacc
 LOCAL_SRC_FILES := acc.cpp
 
-LOCAL_SHARED_LIBRARIES := libdl libcutils
+LOCAL_SHARED_LIBRARIES := libdl libcutils liblog
 
 include $(BUILD_SHARED_LIBRARY)
 
