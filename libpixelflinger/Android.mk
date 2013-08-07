@@ -50,14 +50,7 @@ PIXELFLINGER_SRC_FILES += arch-mips/t32cb16blend.S
 PIXELFLINGER_CFLAGS += -fstrict-aliasing -fomit-frame-pointer
 endif
 
-LOCAL_SHARED_LIBRARIES := libcutils
-
-ifneq ($(TARGET_ARCH),arm)
-# Required to define logging functions on the simulator.
-# TODO: move the simulator logging functions into libcutils with
-# the rest of the basic log stuff.
-LOCAL_SHARED_LIBRARIES += libutils
-endif
+LOCAL_SHARED_LIBRARIES := libcutils liblog
 
 #
 # Shared library
@@ -82,7 +75,7 @@ include $(BUILD_SHARED_LIBRARY)
 include $(CLEAR_VARS)
 LOCAL_MODULE:= libpixelflinger_static
 LOCAL_SRC_FILES := $(PIXELFLINGER_SRC_FILES)
-LOCAL_CFLAGS := $(PIXELFLINGER_CFLAGS) 
+LOCAL_CFLAGS := $(PIXELFLINGER_CFLAGS)
 include $(BUILD_STATIC_LIBRARY)
 
 

@@ -65,9 +65,12 @@ LOCAL_SRC_FILES:= \
 	$(patsubst %,%.c,$(TOOLS))
 
 LOCAL_STATIC_LIBRARIES := libreboot
-LOCAL_SHARED_LIBRARIES := libcutils libc
+LOCAL_SHARED_LIBRARIES := \
+	libcutils \
+	liblog \
+	libc \
 
-LOCAL_MODULE:= toolbox
+LOCAL_MODULE := toolbox
 
 # Including this will define $(intermediates).
 #
