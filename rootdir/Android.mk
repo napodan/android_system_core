@@ -1,10 +1,17 @@
 LOCAL_PATH:= $(call my-dir)
+
+include $(CLEAR_VARS)
+LOCAL_MODULE := dbus.conf
+LOCAL_SRC_FILES := etc/$(LOCAL_MODULE)
+LOCAL_MODULE_CLASS := ETC
+LOCAL_MODULE_PATH := $(TARGET_OUT)/etc
+include $(BUILD_PREBUILT)
+
 include $(CLEAR_VARS)
 
 # files that live under /system/etc/...
 
 copy_from := \
-	etc/dbus.conf \
 	etc/hosts
 
 ifeq ($(TARGET_PRODUCT),generic)
