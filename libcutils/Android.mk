@@ -35,6 +35,7 @@ commonSources := \
 	socket_loopback_client.c \
 	socket_loopback_server.c \
 	socket_network_client.c \
+	sockets.c \
 	config_utils.c \
 	cpu_info.c \
 	load_file.c \
@@ -72,8 +73,10 @@ ifeq ($(WINDOWS_HOST_ONLY),1)
 else
     commonSources += \
         abort_socket.c \
+        fs.c \
         mspace.c \
         selector.c \
+        multiuser.c \
         tztime.c \
         zygote.c
 
@@ -120,6 +123,7 @@ LOCAL_SRC_FILES := $(commonSources) \
         klog.c \
         mq.c \
         partition_utils.c \
+        trace.c \
         uevent.c
 
 ifeq ($(TARGET_ARCH),arm)
