@@ -5,6 +5,7 @@
 #
 
 import /init.environ.rc
+import /init.trace.rc
 
 on early-init
     start ueventd
