@@ -1,12 +1,5 @@
 LOCAL_PATH:= $(call my-dir)
 
-include $(CLEAR_VARS)
-LOCAL_MODULE := dbus.conf
-LOCAL_SRC_FILES := etc/$(LOCAL_MODULE)
-LOCAL_MODULE_CLASS := ETC
-LOCAL_MODULE_PATH := $(TARGET_OUT)/etc
-include $(BUILD_PREBUILT)
-
 #######################################
 # init.rc
 # Only copy init.rc if the target doesn't have its own.
@@ -20,23 +13,6 @@ LOCAL_MODULE_PATH := $(TARGET_ROOT_OUT)
 
 include $(BUILD_PREBUILT)
 endif
-
-# create some directories (some are mount points)
-DIRS := $(addprefix $(TARGET_ROOT_OUT)/, \
-		sbin \
-		dev \
-		proc \
-		sys \
-		system \
-		data \
-	) \
-	$(TARGET_OUT_DATA)
-
-$(DIRS):
-	@echo Directory: $@
-	@mkdir -p $@
-
-ALL_PREBUILT += $(DIRS)
 #######################################
 # init.environ.rc
 
