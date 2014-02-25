@@ -48,22 +48,6 @@
 extern "C" {
 #endif
 
-/*
-  mspace_usable_size(void* p);
-
-  Returns the number of bytes you can actually use in
-  an allocated chunk, which may be more than you requested (although
-  often not) due to alignment and minimum size constraints.
-  You can use this many bytes without worrying about
-  overwriting other allocated objects. This is not a particularly great
-  programming practice. mspace_usable_size can be more useful in
-  debugging and assertions, for example:
-
-  p = mspace_malloc(msp, n);
-  assert(mspace_usable_size(msp, p) >= 256);
-*/
-size_t mspace_usable_size(mspace, const void*);
-
 #if USE_CONTIGUOUS_MSPACES
 /*
   Similar to create_mspace(), but the underlying memory is

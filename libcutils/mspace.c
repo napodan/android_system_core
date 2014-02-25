@@ -65,20 +65,6 @@ static void *contiguous_mspace_morecore(mstate0 m, ssize_t nb);
 #define ALIGN_UP(p, alignment) \
     (((uintptr_t)(p) + (alignment)-1) & ~((alignment)-1))
 
-/* A direct copy of dlmalloc_usable_size(),
- * which isn't compiled in when ONLY_MSPACES is set.
- * The mspace parameter isn't actually necessary,
- * but we include it to be consistent with the
- * rest of the mspace_*() functions.
- */
-size_t mspace_usable_size(mspace _unused, const void* mem) {
-  if (mem != 0) {
-    const mchunkptr p = mem2chunk(mem);
-    if (cinuse(p))
-      return chunksize(p) - overhead_for(p);
-  }
-  return 0;
-}
 
 #if USE_CONTIGUOUS_MSPACES
 #include <sys/mman.h>
